@@ -32,7 +32,15 @@ fn parse_server_address(addr: &str) -> Result<SocketAddr, AddrParseError> {
         .attach_printable_lazy(|| {
             format!("Could not parse '{addr}' as a socket address")
         })
-        // .change_context(std::net::AddrParseError)
+}
+
+async fn bind_to_address(addr: SocketAddr) -> Result<TcpListener, io::Error> {
+    TcpListener::bind(addr)
+        .await
+        .report()
+        .attach_printable_lazy(|| {
+            format!("Could not attach to address {addr}.")
+        })
 }
 
 // Issues to deal with:
@@ -49,13 +57,10 @@ async fn main() -> Result<(), ServerError> {
     let server_address: SocketAddr 
         = parse_server_address(server_address)
           .change_context(ServerError)?;
+
     let listener 
-        = TcpListener::bind(server_address)
+        = bind_to_address(server_address)
             .await
-            .report()
-            .attach_printable_lazy(|| {
-                format!("Could not attach to address {server_address}.")
-            })
             .change_context(ServerError)?;
 
     loop {
