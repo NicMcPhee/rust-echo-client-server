@@ -34,6 +34,10 @@ fn parse_server_address(addr: &str) -> Result<SocketAddr, AddrParseError> {
         })
 }
 
+// TODO: Should I create a simple unit type `BindError` to return here instead
+//   of `io::Error`. `BindError` would (to me) read better here, but it would
+//   require all that boilerplate and I'm not sure that the minimal help here
+//   would justify the fuss.
 async fn bind_to_address(addr: SocketAddr) -> Result<TcpListener, io::Error> {
     TcpListener::bind(addr)
         .await
@@ -41,6 +45,14 @@ async fn bind_to_address(addr: SocketAddr) -> Result<TcpListener, io::Error> {
         .attach_printable_lazy(|| {
             format!("Could not attach to address {addr}.")
         })
+}
+
+async fn accept_connection(listener: &TcpListener) -> Result<TcpStream, io::Error> {
+    listener
+        .accept()
+        .await
+        .report()
+        .map(|(socket, _)| socket)
 }
 
 // Issues to deal with:
@@ -52,20 +64,20 @@ async fn bind_to_address(addr: SocketAddr) -> Result<TcpListener, io::Error> {
 #[tokio::main]
 async fn main() -> Result<(), ServerError> {
     // TODO: Let the user set this port via the command line.
-    // TODO: Handle errors when binding to the address.
     let server_address = "127.0.0.1:60606";
     let server_address: SocketAddr 
         = parse_server_address(server_address)
-          .change_context(ServerError)?;
-
+            .change_context(ServerError)?;
     let listener 
         = bind_to_address(server_address)
             .await
             .change_context(ServerError)?;
 
     loop {
-        // TODO: Handle errors when accepting requests.
-        let (socket, _) = listener.accept().await.map_err(|_| ServerError)?;
+        let socket 
+            = accept_connection(&listener)
+                .await
+                .change_context(ServerError)?;
         tokio::spawn(async move {
             // TODO: Handle error when processing socket.
             echo_stream(socket).await.expect("There was a problem handling a socket");
