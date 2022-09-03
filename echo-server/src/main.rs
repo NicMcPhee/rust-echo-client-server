@@ -5,42 +5,35 @@
 
 use core::fmt;
 use std::io;
+use std::error::Error;
+use std::net::{SocketAddr, AddrParseError};
 
-use error_stack::{Context, Result, IntoReport, ResultExt};
+use error_stack::{Result, IntoReport, ResultExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 const BUFFER_SIZE: usize = 128;
 
 #[derive(Debug)]
-struct BindError;
-
-impl fmt::Display for BindError {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.write_str("Couldn't bind to the given address")
-    }
-}
-
-impl Context for BindError {}
-
-#[derive(Debug)]
-enum ServerError {
-    BindError(String),
-    IoError
-}
+struct ServerError;
 
 impl fmt::Display for ServerError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::BindError(address) 
-                => write!(fmt, "There was a problem binding to the server address {address}"),
-            Self::IoError 
-                => fmt.write_str("There was an I/O problem with the server")
-        }
+        fmt.write_str("there was an error in the server")
     }
 }
 
-impl Context for ServerError {}
+impl Error for ServerError {}
+
+fn parse_server_address(addr: &str) -> Result<SocketAddr, AddrParseError> {
+    addr
+        .parse::<SocketAddr>()
+        .report()
+        .attach_printable_lazy(|| {
+            format!("Could not parse '{addr}' as a socket address")
+        })
+        // .change_context(std::net::AddrParseError)
+}
 
 // Issues to deal with:
 // - Our error handling is fairly weak.
@@ -51,8 +44,11 @@ impl Context for ServerError {}
 #[tokio::main]
 async fn main() -> Result<(), ServerError> {
     // TODO: Let the user set this port via the command line.
-    // TODO: Handle errors when binding ot the address.
+    // TODO: Handle errors when binding to the address.
     let server_address = "127.0.0.1:60606";
+    let server_address: SocketAddr 
+        = parse_server_address(server_address)
+          .change_context(ServerError)?;
     let listener 
         = TcpListener::bind(server_address)
             .await
@@ -60,11 +56,11 @@ async fn main() -> Result<(), ServerError> {
             .attach_printable_lazy(|| {
                 format!("Could not attach to address {server_address}.")
             })
-            .change_context(ServerError::BindError(server_address.to_string()))?;
+            .change_context(ServerError)?;
 
     loop {
         // TODO: Handle errors when accepting requests.
-        let (socket, _) = listener.accept().await.map_err(|_| ServerError::IoError)?;
+        let (socket, _) = listener.accept().await.map_err(|_| ServerError)?;
         tokio::spawn(async move {
             // TODO: Handle error when processing socket.
             echo_stream(socket).await.expect("There was a problem handling a socket");
