@@ -55,6 +55,8 @@ fn parse_server_address(addr: &str) -> Result<SocketAddr, AddrParseError> {
 //   of `io::Error`? `BindError` would (to me) read better here, but it would
 //   require all that boilerplate and I'm not sure that the minimal help here
 //   would justify the fuss.
+// We could create an enum type like `ConnectionError` that includes things
+// like parsing errors and binding errors.
 async fn bind_to_address(addr: SocketAddr) -> Result<TcpListener, io::Error> {
     TcpListener::bind(addr)
         .await
@@ -73,9 +75,11 @@ async fn accept_connection(listener: &TcpListener) -> Result<TcpStream, io::Erro
 }
 
 // Issues to deal with:
-// - Our error handling is fairly weak.
-// - There should be "proper" logging added to this.
-// - Add something like `clap` to handle command line arguments
+// TODO Decide on the structure of the two parts of the project:
+//   - Bring the client and server projects into one project, with two separate binary crates.
+//   - Look into workspaces and see what that would look like as an alternative to separate
+//     binary crates.
+// TODO Add something like `clap` to handle command line arguments
 //   - We could specify the port number that way.
 
 fn log_communication_error(err: &Report<ServerError>) {
@@ -101,7 +105,6 @@ async fn main() -> Result<(), ServerError> {
                 .await
                 .change_context(ServerError)?;
         tokio::spawn(async move {
-            // TODO: Handle error when processing socket.
             let res = echo_stream(socket)
                 .await
                 .attach_printable_lazy(|| {
@@ -119,7 +122,6 @@ async fn main() -> Result<(), ServerError> {
 async fn echo_stream(mut socket: TcpStream) -> Result<(), SocketCommunicationError> {
     info!("Handling a stream: {:?}", socket);
     let mut buf = [0; BUFFER_SIZE];
-    // TODO: Handle the error case here.
     loop {
         let num_read_bytes 
             = socket
