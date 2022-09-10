@@ -8,7 +8,10 @@ use std::io;
 use std::error::Error;
 use std::net::{SocketAddr, AddrParseError};
 
-use error_stack::{Result, IntoReport, ResultExt};
+use error_stack::{Result, IntoReport, ResultExt, Report};
+
+use log::{error, info};
+
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -75,8 +78,13 @@ async fn accept_connection(listener: &TcpListener) -> Result<TcpStream, io::Erro
 // - Add something like `clap` to handle command line arguments
 //   - We could specify the port number that way.
 
+fn log_communication_error(err: &Report<ServerError>) {
+    error!("{err:?}");
+}
+
 #[tokio::main]
 async fn main() -> Result<(), ServerError> {
+    env_logger::init();
     // TODO: Let the user set this port via the command line.
     let server_address = "127.0.0.1:60606";
     let server_address: SocketAddr 
@@ -94,20 +102,22 @@ async fn main() -> Result<(), ServerError> {
                 .change_context(ServerError)?;
         tokio::spawn(async move {
             // TODO: Handle error when processing socket.
-            let err = echo_stream(socket)
+            let res = echo_stream(socket)
                 .await
                 .attach_printable_lazy(|| {
                     format!("Failure when communicating with socket at address {server_address}.")
                 })
                 .change_context(ServerError);
-            dbg!(err)
+            if let Err(err) = res {
+                log_communication_error(&err);
+            }
         });
 
     }
 }
 
 async fn echo_stream(mut socket: TcpStream) -> Result<(), SocketCommunicationError> {
-    println!("Handling a stream: {:?}", socket);
+    info!("Handling a stream: {:?}", socket);
     let mut buf = [0; BUFFER_SIZE];
     // TODO: Handle the error case here.
     loop {
@@ -118,7 +128,7 @@ async fn echo_stream(mut socket: TcpStream) -> Result<(), SocketCommunicationErr
                 .report()
                 .change_context(SocketCommunicationError::Read)?;
         if num_read_bytes == 0 {
-            println!("Done handling stream {:?}", socket);
+            info!("Done handling stream {:?}", socket);
             return Ok(());
         }
         socket
