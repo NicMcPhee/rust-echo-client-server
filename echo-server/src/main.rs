@@ -25,6 +25,20 @@ impl fmt::Display for ServerError {
 
 impl Error for ServerError {}
 
+#[derive(Debug)]
+enum SocketCommunicationError {
+    Read,
+    Write
+}
+
+impl fmt::Display for SocketCommunicationError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.write_str("there was an error while communicating on a socket")
+    }
+}
+
+impl Error for SocketCommunicationError {}
+
 fn parse_server_address(addr: &str) -> Result<SocketAddr, AddrParseError> {
     addr
         .parse::<SocketAddr>()
@@ -35,7 +49,7 @@ fn parse_server_address(addr: &str) -> Result<SocketAddr, AddrParseError> {
 }
 
 // TODO: Should I create a simple unit type `BindError` to return here instead
-//   of `io::Error`. `BindError` would (to me) read better here, but it would
+//   of `io::Error`? `BindError` would (to me) read better here, but it would
 //   require all that boilerplate and I'm not sure that the minimal help here
 //   would justify the fuss.
 async fn bind_to_address(addr: SocketAddr) -> Result<TcpListener, io::Error> {
@@ -80,23 +94,37 @@ async fn main() -> Result<(), ServerError> {
                 .change_context(ServerError)?;
         tokio::spawn(async move {
             // TODO: Handle error when processing socket.
-            echo_stream(socket).await.expect("There was a problem handling a socket");
+            let err = echo_stream(socket)
+                .await
+                .attach_printable_lazy(|| {
+                    format!("Failure when communicating with socket at address {server_address}.")
+                })
+                .change_context(ServerError);
+            dbg!(err)
         });
+
     }
 }
 
-async fn echo_stream(mut socket: TcpStream) -> io::Result<()> {
+async fn echo_stream(mut socket: TcpStream) -> Result<(), SocketCommunicationError> {
     println!("Handling a stream: {:?}", socket);
     let mut buf = [0; BUFFER_SIZE];
     // TODO: Handle the error case here.
     loop {
-        // Handle error when reading from socket.
-        let num_read_bytes = socket.read(&mut buf).await?;
+        let num_read_bytes 
+            = socket
+                .read(&mut buf)
+                .await
+                .report()
+                .change_context(SocketCommunicationError::Read)?;
         if num_read_bytes == 0 {
             println!("Done handling stream {:?}", socket);
             return Ok(());
         }
-        // TODO: Handle the error case here.
-        socket.write_all(&buf[0..num_read_bytes]).await?;
+        socket
+            .write_all(&buf[0..num_read_bytes])
+            .await
+            .report()
+            .change_context(SocketCommunicationError::Write)?;
     }
 }
