@@ -79,7 +79,7 @@ async fn accept_connection(listener: &TcpListener) -> Result<TcpStream, io::Erro
 //   - We could specify the port number that way.
 
 fn log_communication_error(err: &Report<ServerError>) {
-    error!("{err:?}");
+    error!("\n{err:?}");
 }
 
 #[tokio::main]
@@ -130,6 +130,10 @@ async fn echo_stream(mut socket: TcpStream) -> Result<(), SocketCommunicationErr
         if num_read_bytes == 0 {
             info!("Done handling stream {:?}", socket);
             return Ok(());
+            // The following lines force a communication error which might be useful
+            // for testing.
+            // return Err(Report::new(SocketCommunicationError::Read)
+            //             .attach_printable("We forced an error when the socket closed."));
         }
         socket
             .write_all(&buf[0..num_read_bytes])
