@@ -1,23 +1,10 @@
-use std::{io::{self, Read, Write}, net::{IpAddr, SocketAddr}};
+use std::{io::{self, Read, Write}, net::SocketAddr};
 
 use clap::Parser;
 
+use echo_client_server::{BUFFER_SIZE, Args};
+
 use tokio::{net::TcpStream, io::{AsyncWriteExt, AsyncReadExt}};
-
-const BUFFER_SIZE: usize = 128;
-
-/// Simple echo client
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct Args {
-   /// The IP address to connect to
-   #[clap(short, long, value_parser, default_value = "127.0.0.1")]
-   ip_address: IpAddr,
-
-   /// The port number to connect to
-   #[clap(short, long, value_parser, default_value_t = 60606)]
-   port: u16,
-}
 
 #[tokio::main]
 async fn main() -> Result<(), io::Error> {
