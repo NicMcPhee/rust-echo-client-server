@@ -84,6 +84,7 @@ async fn main() -> Result<(), ServerError> {
 
     let args = Args::parse();
     let server_address = SocketAddr::new(args.ip_address, args.port);
+    info!("The server is listening at {server_address}");
 
     let listener 
         = bind_to_address(server_address)
@@ -111,7 +112,12 @@ async fn main() -> Result<(), ServerError> {
 }
 
 async fn echo_stream(mut socket: TcpStream) -> Result<(), SocketCommunicationError> {
-    info!("Handling a stream: {:?}", socket);
+    // There shouldn't be an error unwrapping the peer address since the connection
+    // has already been established.
+    #[allow(clippy::unwrap_used)]
+    let peer_ip = socket.peer_addr().unwrap().ip();
+    info!("Handling a stream from IP address {peer_ip:?}");
+
     let mut buf = [0; BUFFER_SIZE];
     loop {
         let num_read_bytes 
@@ -121,7 +127,7 @@ async fn echo_stream(mut socket: TcpStream) -> Result<(), SocketCommunicationErr
                 .report()
                 .change_context(SocketCommunicationError::Read)?;
         if num_read_bytes == 0 {
-            info!("Done handling stream {:?}", socket);
+            info!("Done handling stream from IP address {peer_ip:?}");
             return Ok(());
             // The following lines force a communication error which might be useful
             // for testing.
