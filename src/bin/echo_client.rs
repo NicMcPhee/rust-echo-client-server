@@ -13,6 +13,12 @@ async fn main() -> Result<(), io::Error> {
     let mut socket = TcpStream::connect(server_address).await?;
     let mut buf = [0; BUFFER_SIZE];
 
+    // TODO: I could split this into two threads, each running a separate
+    //   `loop`. One would read from `stdin` and write to the socket, and the
+    //   other would read from the socket and write to `stdout`. This was
+    //   somewhat useful in the Java version to handle the closure of the
+    //   sockets gracefully, but that doesn't seem to be an issue in Rust, so
+    //   maybe it's not worth the trouble adding that complication?
     loop {
         let stdio_bytes_read = io::stdin().read(&mut buf)?;
         if stdio_bytes_read == 0 {
