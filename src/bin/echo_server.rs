@@ -6,7 +6,7 @@
 use core::fmt;
 use std::io;
 use std::error::Error;
-use std::net::{SocketAddr, AddrParseError};
+use std::net::SocketAddr;
 
 use clap::Parser;
 use echo_client_server::{Args, BUFFER_SIZE};
@@ -41,15 +41,6 @@ impl fmt::Display for SocketCommunicationError {
 }
 
 impl Error for SocketCommunicationError {}
-
-fn parse_server_address(addr: &str) -> Result<SocketAddr, AddrParseError> {
-    addr
-        .parse::<SocketAddr>()
-        .report()
-        .attach_printable_lazy(|| {
-            format!("Could not parse '{addr}' as a socket address")
-        })
-}
 
 // TODO: Should I create a simple unit type `BindError` to return here instead
 //   of `io::Error`? `BindError` would (to me) read better here, but it would
