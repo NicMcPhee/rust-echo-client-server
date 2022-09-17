@@ -8,14 +8,14 @@ use std::io;
 use std::error::Error;
 use std::net::{SocketAddr, AddrParseError};
 
+use clap::Parser;
+use echo_client_server::{Args, BUFFER_SIZE};
 use error_stack::{Result, IntoReport, ResultExt, Report};
 
 use log::{error, info};
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-const BUFFER_SIZE: usize = 128;
 
 #[derive(Debug)]
 struct ServerError;
@@ -74,14 +74,6 @@ async fn accept_connection(listener: &TcpListener) -> Result<TcpStream, io::Erro
         .map(|(socket, _)| socket)
 }
 
-// Issues to deal with:
-// TODO Decide on the structure of the two parts of the project:
-//   - Bring the client and server projects into one project, with two separate binary crates.
-//   - Look into workspaces and see what that would look like as an alternative to separate
-//     binary crates.
-// TODO Add something like `clap` to handle command line arguments
-//   - We could specify the port number that way.
-
 fn log_communication_error(err: &Report<ServerError>) {
     error!("\n{err:?}");
 }
@@ -89,11 +81,10 @@ fn log_communication_error(err: &Report<ServerError>) {
 #[tokio::main]
 async fn main() -> Result<(), ServerError> {
     env_logger::init();
-    // TODO: Let the user set this port via the command line.
-    let server_address = "127.0.0.1:60606";
-    let server_address: SocketAddr 
-        = parse_server_address(server_address)
-            .change_context(ServerError)?;
+
+    let args = Args::parse();
+    let server_address = SocketAddr::new(args.ip_address, args.port);
+
     let listener 
         = bind_to_address(server_address)
             .await
