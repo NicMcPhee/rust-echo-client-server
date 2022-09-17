@@ -69,6 +69,11 @@ fn log_communication_error(err: &Report<ServerError>) {
     error!("\n{err:?}");
 }
 
+// TODO: I should stress test the server and see how many
+//   connections it can handle. This would be particularly
+//   interesting on one of the multi-core server boxes in
+//   the lab.
+
 #[tokio::main]
 async fn main() -> Result<(), ServerError> {
     env_logger::init();
